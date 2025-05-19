@@ -24,6 +24,14 @@ Tab2Section:NewButton("No Boss Attacks", "Removes the boss attacks. (Some still 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/sunexn/standsawakening/main/uncanny.lua", true))() -- open source
 end)
 
-Tab3Section:NewButton("Infinite Yield", "Tip: Use Inf Jump to pass the boss obby", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/edgeiy/infiniteyield/master/source", true))()
+Tab3Section:NewButton("Infinite Jump", "Allows you to jump without limiting", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Vqnxlr/fnas/refs/heads/main/infj.lua", true))()
+end)
+
+Tab3Section:NewButton("Full Bright", "Removes vision blockers", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Vqnxlr/fnas/refs/heads/main/fb.lua", true))()
+end)
+
+Tab3Section:NewButton("No Fog", "Removes the fog", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Vqnxlr/fnas/refs/heads/main/nf.lua", true))()
 end)

@@ -15,6 +15,10 @@ Tab1Section:NewButton("BeboScript", "Gives You an OP gui", function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/Bebo-Mods/BeboScripts/main/StandAwekening.lua"))()
 end)
 
+Tab2Section:NewButton("Teleport to Boss Lobby", "TP to the Boss Lobby (No keys required)", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Vqnxlr/fnas/refs/heads/main/tptoboss.lua", true))()
+end)
+
 Tab2Section:NewButton("No Sword Cooldown", "No sword animation cooldown (Use with No Boss Attacks!)", function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/itsyouranya/free/main/Anya%20Stands%20Awakening%20Helper.lua", true))()
 end)

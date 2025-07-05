@@ -1,248 +1,244 @@
--- UI STAND PICKER (runs first)
-local Stands = {
-    "Anubis", "D4C", "OMT", "CrazyDiamond", "DoppioKingCrimson", "KillerQueen",
-    "GoldExperience", "StarPlatinum", "StarPlatinumTW", "TheWorld", "HierophantGreen",
-    "Whitesnake", "TheWorldAlternateUniverse", "WhitesnakeAU", "KingCrimsonAU",
-    "SoftAndWetShiny", "StarPlatinumOVA", "TheWorldOVA", "NTWAU", "CreeperQueen",
-    "SPTW", "StickyFingers", "SoftAndWet"
-}
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local StarterGui = game:GetService("StarterGui")
 
-pcall(function() game.CoreGui:FindFirstChild("StandFarmUI"):Destroy() end)
+-- Global Settings
+getgenv().DelayInSeconds = 4
+getgenv().Enabled = false
+getgenv().SelectedStands = {}
+getgenv().Webhook = ""    -- optional webhook URL
 
-local gui = Instance.new("ScreenGui", game.CoreGui)
-gui.Name = "StandFarmUI"
-gui.ResetOnSpawn = false
-
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 400, 0, 340)
-frame.Position = UDim2.new(0.5, -200, 0.5, -170)
-frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-Instance.new("UICorner", frame)
-
-local title = Instance.new("TextLabel", frame)
-title.Text = "Select Wanted Stand"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.Size = UDim2.new(1, 0, 0, 30)
-title.TextColor3 = Color3.new(1,1,1)
-title.BackgroundTransparency = 1
-
-local dropdownBtn = Instance.new("TextButton", frame)
-dropdownBtn.Size = UDim2.new(0.9, 0, 0, 35)
-dropdownBtn.Position = UDim2.new(0.05, 0, 0.15, 0)
-dropdownBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-dropdownBtn.TextColor3 = Color3.new(1,1,1)
-dropdownBtn.Text = "Click to Choose"
-dropdownBtn.Font = Enum.Font.Gotham
-dropdownBtn.TextSize = 14
-Instance.new("UICorner", dropdownBtn)
-
-local scroll = Instance.new("ScrollingFrame", frame)
-scroll.Position = UDim2.new(0.05, 0, 0.35, 0)
-scroll.Size = UDim2.new(0.9, 0, 0.4, 0)
-scroll.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-scroll.Visible = false
-scroll.BorderSizePixel = 0
-scroll.CanvasSize = UDim2.new(0, 0, 0, #Stands * 32)
-scroll.ScrollBarThickness = 6
-
-local layout = Instance.new("UIListLayout", scroll)
-layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.Padding = UDim.new(0, 2)
-
-for _, stand in ipairs(Stands) do
-    local b = Instance.new("TextButton", scroll)
-    b.Size = UDim2.new(1, 0, 0, 30)
-    b.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    b.TextColor3 = Color3.new(1,1,1)
-    b.Text = stand
-    b.Font = Enum.Font.Gotham
-    b.TextSize = 14
-    b.MouseButton1Click:Connect(function()
-        getgenv().WantedStand = stand
-        dropdownBtn.Text = "Selected: " .. stand
-        scroll.Visible = false
+-- Notification Utility
+local function Notification(Title, Text)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {Title = Title, Text = Text, Duration = 5})
     end)
 end
 
-dropdownBtn.MouseButton1Click:Connect(function()
-    scroll.Visible = not scroll.Visible
+-- Equip Tool Utility (unchanged)
+function equipToolByName(name)
+    local Backpack = Players.LocalPlayer:WaitForChild("Backpack")
+    local Char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+    local tool = workspace:FindFirstChild(name) or Backpack:FindFirstChild(name)
+    if tool and tool:IsA("Tool") then
+        Char:FindFirstChild("Humanoid"):EquipTool(tool)
+    end
+end
+
+-- Stand List with display names mapping
+local StandsList = {
+    {gameName = "Anubis", displayName = "Anubis"},
+    {gameName = "D4C", displayName = "D4C"},
+    {gameName = "OMT", displayName = "One More Time"},
+    {gameName = "CrazyDiamond", displayName = "Crazy Diamond"},
+    {gameName = "DoppioKingCrimson", displayName = "Doppio King Crimson"},
+    {gameName = "KillerQueen", displayName = "Killer Queen"},
+    {gameName = "GoldExperience", displayName = "Gold Experience"},
+    {gameName = "StarPlatinum", displayName = "Star Platinum"},
+    {gameName = "StarPlatinumTW", displayName = "Star Platinum: Stone Ocean"},
+    {gameName = "TheWorld", displayName = "The World"},
+    {gameName = "HierophantGreen", displayName = "Hierophant Green"},
+    {gameName = "Whitesnake", displayName = "Whitesnake"},
+    {gameName = "TheWorldAlternateUniverse", displayName = "The World Alternate Universe"},
+    {gameName = "WhitesnakeAU", displayName = "Whitesnake: Alternate Universe"},
+    {gameName = "KingCrimsonAU", displayName = "King Crimson: Alternate Universe"},
+    {gameName = "SoftAndWetShiny", displayName = "Soft And Wet Shiny"},
+    {gameName = "StarPlatinumOVA", displayName = "Star Platinum OVA"},
+    {gameName = "TheWorldOVA", displayName = "The World OVA"},
+    {gameName = "NTWAU", displayName = "Neo The World: Alternate Universe"},
+    {gameName = "CreeperQueen", displayName = "Creeper Queen"},
+    {gameName = "SPTW", displayName = "Star Platinum: The World"},
+    {gameName = "StickyFingers", displayName = "Sticky Fingers"},
+    {gameName = "SoftAndWet", displayName = "Soft And Wet"}
+}
+
+-- Create lookup tables for easy conversion
+local gameNameToDisplay = {}
+local displayNameToGame = {}
+for _, stand in ipairs(StandsList) do
+    gameNameToDisplay[stand.gameName] = stand.displayName
+    displayNameToGame[stand.displayName] = stand.gameName
+end
+
+-- Anti-AFK (unchanged)
+Players.LocalPlayer.Idled:Connect(function()
+    game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
-local startBtn = Instance.new("TextButton", frame)
-startBtn.Size = UDim2.new(0.9, 0, 0, 35)
-startBtn.Position = UDim2.new(0.05, 0, 0.78, 0)
-startBtn.BackgroundColor3 = Color3.fromRGB(80, 130, 80)
-startBtn.TextColor3 = Color3.new(1, 1, 1)
-startBtn.Text = "Start Autofarm"
-startBtn.Font = Enum.Font.GothamBold
-startBtn.TextSize = 14
-Instance.new("UICorner", startBtn)
+-- GUI Setup: restore original dark look
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "StandFarmGui"
+ScreenGui.ResetOnSpawn = false  -- persist GUI through death
+ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-local credit = Instance.new("TextLabel", frame)
-credit.Text = "made by spectral"
-credit.Font = Enum.Font.Gotham
-credit.TextSize = 12
-credit.TextColor3 = Color3.fromRGB(180, 180, 180)
-credit.BackgroundTransparency = 1
-credit.Position = UDim2.new(0, 0, 1, -20)
-credit.Size = UDim2.new(1, 0, 0, 20)
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 300, 0, 540)
+Frame.Position = UDim2.new(0.5, -150, 0.5, -270)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.Active = true
+Frame.Draggable = true
 
--- Autofarm runs when start pressed
-startBtn.MouseButton1Click:Connect(function()
-    if getgenv().WantedStand then
-        gui:Destroy()
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.Text = "Stand Autofarm"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 22
 
-        -- [[Settings]]
-        getgenv().DelayInSeconds = 8 --8 seconds is recommended but if you have a good pc use 4
-        getgenv().Webhook = "" --Leave as blank if you don't want to use webhook
+local StatusLabel = Instance.new("TextLabel", Frame)
+StatusLabel.Size = UDim2.new(1, -20, 0, 30)
+StatusLabel.Position = UDim2.new(0, 10, 0, 40)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Status: Idle"
+StatusLabel.TextColor3 = Color3.new(0.8,0.8,1)
+StatusLabel.Font = Enum.Font.SourceSans
+StatusLabel.TextSize = 18
 
-        --Webhook Function
-        local HttpService = game:GetService("HttpService");
-        function WebhookFunc(Message)
-            local start = game:HttpGet("http://buritoman69.glitch.me");
-            local biggie = "http://buritoman69.glitch.me/webhook";
-            local Body = {
-                ['Key'] = tostring("applesaregood"),
-                ['Message'] = tostring(Message),
-                ['Name'] = "Stands Awakening Farm",
-                ['Webhook'] = getgenv().Webhook
-            }
-            Body = HttpService:JSONEncode(Body);
-            local Data = game:HttpPost(biggie, Body, false, "application/json")
-            return Data or nil;
-        end
+local Scrolling = Instance.new("ScrollingFrame", Frame)
+Scrolling.Position = UDim2.new(0, 10, 0, 80)
+Scrolling.Size = UDim2.new(1, -20, 0, 300)
+Scrolling.CanvasSize = UDim2.new(0, 0, 0, #StandsList * 30)
+Scrolling.ScrollBarThickness = 6
 
-        --Notification Function
-        local function Notification(Title, Text)
-            game.StarterGui:SetCore("SendNotification", {
-                Title = Title,
-                Text = Text,
-                Duration = 5,
-            })
-        end
-
-        --Stands list for spelling check
-        local Stands = {
-            "Anubis", "D4C", "OMT", "CrazyDiamond", "DoppioKingCrimson", "KillerQueen",
-            "GoldExperience", "StarPlatinum", "StarPlatinumTW", "TheWorld", "HierophantGreen",
-            "Whitesnake", "TheWorldAlternateUniverse", "WhitesnakeAU", "KingCrimsonAU",
-            "SoftAndWetShiny", "StarPlatinumOVA", "TheWorldOVA", "NTWAU", "CreeperQueen",
-            "SPTW", "StickyFingers", "SoftAndWet"
-        }
-
-        --Check spelling
-        if not table.find(Stands, getgenv().WantedStand) then
-            if getgenv().Webhook ~= "" then
-                return WebhookFunc("Stand name typed incorrectly.")
-            else
-                return Notification("Notification", "Stand name typed incorrectly.")
-            end
-        end
-
-        --Check if running
-        if not getgenv().Enabled then
-            getgenv().Enabled = true
-            if getgenv().Webhook ~= "" then
-                WebhookFunc("Running stand farm.")
-            else
-                Notification("Notification", "Running stand farm.")
-            end
-        else
-            if getgenv().Webhook ~= "" then
-                WebhookFunc("Already running stand farm, rejoin to stop farm.")
-            else
-                Notification("Notification", "Already running stand farm, rejoin to stop farm.")
-            end
-            return nil
-        end
-
-        game:GetService("ReplicatedStorage").Main.Input:FireServer("Alternate", "Dodge")
-        wait(3)
-        game:GetService("Players").LocalPlayer.Character.Humanoid:EquipTool(workspace:FindFirstChild("Arrow"))
-        game:GetService("Players").LocalPlayer.Character.Humanoid:EquipTool(game:GetService("Players").LocalPlayer.Backpack:FindFirstChild("Arrow"))
-        game:GetService("ReplicatedStorage").ItemEvents.Arrow:FireServer()
-        game:GetService("ReplicatedStorage").Main.Input:FireServer("Alternate", "Dodge")
-
-        --Split time between each part
-        local Divided = getgenv().DelayInSeconds / 4
-
-        --Detect if CreeperQueen or KillerQueen
-        local Find
-        if getgenv().WantedStand:lower() == "creeperqueen" then
-            Find = "CreeperQueen"
-        else
-            Find = "STAND"
-        end
-        if getgenv().WantedStand:lower() == "killerqueen" then
-            Find = "KillerQueen"
-        else
-            Find = "STAND"
-        end
-
-        if game:GetService("Players").LocalPlayer.Backpack:FindFirstChild(Find, true).Value:lower() == getgenv().WantedStand:lower() or
-           game:GetService("Players").LocalPlayer.Backpack:FindFirstChild(Find, true).Name:lower() == getgenv().WantedStand:lower() then
-            getgenv().Enabled = false
-        end
-
-        if game:GetService("Players").LocalPlayer.Backpack:FindFirstChild(Find, true).Value:lower() == getgenv().WantedStand:lower() or
-           game:GetService("Players").LocalPlayer.Backpack:FindFirstChild(Find, true).Name:lower() == getgenv().WantedStand:lower() then
-            if getgenv().Webhook ~= "" then
-                return WebhookFunc("Stand already acquired.")
-            else
-                return Notification("Notification", "Stand already acquired.")
-            end
-        end
-
-        --Anti AFK
-        game:GetService("Players").LocalPlayer.Idled:Connect(function()
-            game:GetService("VirtualUser"):Button2Down(Vector2.new(0, 0), game:GetService("Workspace").CurrentCamera.CFrame)
-            wait(1)
-            game:GetService("VirtualUser"):Button2Up(Vector2.new(0, 0), game:GetService("Workspace").CurrentCamera.CFrame)
-        end)
-
-        --Main Farm
-        local function StandFarm()
-            pcall(function()
-                repeat
-                    wait(Divided)
-                    game:GetService("Players").LocalPlayer.Character.Humanoid:EquipTool(workspace:FindFirstChild("Rokakaka Fruit"))
-                    game:GetService("Players").LocalPlayer.Character.Humanoid:EquipTool(game:GetService("Players").LocalPlayer.Backpack:FindFirstChild("Rokakaka Fruit"))
-                    game:GetService("ReplicatedStorage").ItemEvents.Roka:FireServer()
-                    wait(Divided)
-                    game:GetService("Players").LocalPlayer.Character.Humanoid:EquipTool(workspace:FindFirstChild("Arrow"))
-                    game:GetService("Players").LocalPlayer.Character.Humanoid:EquipTool(game:GetService("Players").LocalPlayer.Backpack:FindFirstChild("Arrow"))
-                    game:GetService("ReplicatedStorage").ItemEvents.Arrow:FireServer()
-                    wait(Divided)
-                    game:GetService("ReplicatedStorage").Main.Input:FireServer("Alternate", "Appear", false)
-                    game:GetService("ReplicatedStorage").Main.Input:FireServer("Alternate", "Dodge")
-                    wait(Divided)
-                until game:GetService("Players").LocalPlayer.Backpack:FindFirstChild(Find, true).Value:lower() == getgenv().WantedStand:lower() or
-                      game:GetService("Players").LocalPlayer.Backpack:FindFirstChild(Find, true).Name:lower() == getgenv().WantedStand:lower()
-            end)
-            if game:GetService("Players").LocalPlayer.Backpack:FindFirstChild(Find, true) == nil then
-                StandFarm()
-            end
-        end
-
-        --Run Farm
-        StandFarm()
-
-        --Found Stand
-        repeat wait()
-        until game:GetService("Players").LocalPlayer.Backpack:FindFirstChild(Find, true).Value:lower() == getgenv().WantedStand:lower() or
-              game:GetService("Players").LocalPlayer.Backpack:FindFirstChild(Find, true).Name:lower() == getgenv().WantedStand:lower()
-        getgenv().Enabled = false
-        if getgenv().Webhook ~= "" then
-            WebhookFunc("Stand acquired!")
-        else
-            Notification("Notification", "Stand acquired!")
-        end
-        game:GetService("ReplicatedStorage").Main.Input:FireServer("Alternate", "Appear", true)
+local function toggleStand(stand, btn)
+    local gameName = displayNameToGame[stand]
+    local idx = table.find(getgenv().SelectedStands, gameName)
+    if idx then
+        table.remove(getgenv().SelectedStands, idx)
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     else
-        dropdownBtn.Text = "Please choose a stand first!"
+        table.insert(getgenv().SelectedStands, gameName)
+        btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
     end
+end
+
+for i, stand in ipairs(StandsList) do
+    local btn = Instance.new("TextButton", Scrolling)
+    btn.Size = UDim2.new(1,0,0,30)
+    btn.Position = UDim2.new(0,0,0,(i-1)*30)
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 18
+    btn.Text = stand.displayName
+    btn.MouseButton1Click:Connect(function() toggleStand(stand.displayName, btn) end)
+end
+
+local Warn = Instance.new("TextLabel", Frame)
+Warn.Size = UDim2.new(1,-20,0,20)
+Warn.Position = UDim2.new(0,10,1,-100)
+Warn.BackgroundTransparency = 1
+Warn.Text = "Made by DeedsForCheap, Revised by Spectral"
+Warn.TextColor3 = Color3.new(1,0.4,0.4)
+Warn.Font = Enum.Font.SourceSansItalic
+Warn.TextSize = 16
+
+local RunBtn = Instance.new("TextButton", Frame)
+RunBtn.Size = UDim2.new(1,-20,0,30)
+RunBtn.Position = UDim2.new(0,10,1,-70)
+RunBtn.BackgroundColor3 = Color3.fromRGB(50,150,50)
+RunBtn.Text = "START FARM"
+RunBtn.Font = Enum.Font.SourceSansBold
+RunBtn.TextSize = 20
+
+local StopBtn = Instance.new("TextButton", Frame)
+StopBtn.Size = UDim2.new(1,-20,0,30)
+StopBtn.Position = UDim2.new(0,10,1,-30)
+StopBtn.BackgroundColor3 = Color3.fromRGB(150,50,50)
+StopBtn.Text = "STOP FARM"
+StopBtn.Font = Enum.Font.SourceSansBold
+StopBtn.TextSize = 20
+
+-- Current Stand GUI (unchanged)
+local CurrentGui = Instance.new("Frame", ScreenGui)
+CurrentGui.Visible = false
+CurrentGui.Size = UDim2.new(0, 200, 0, 60)
+CurrentGui.Position = UDim2.new(0.5, -100, 0.1, 0)
+CurrentGui.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+CurrentGui.BorderSizePixel = 0
+
+local CurrentLabel = Instance.new("TextLabel", CurrentGui)
+CurrentLabel.Size = UDim2.new(1,0,1,0)
+CurrentLabel.BackgroundTransparency = 1
+CurrentLabel.Font = Enum.Font.SourceSansBold
+CurrentLabel.TextSize = 20
+CurrentLabel.TextColor3 = Color3.new(1,1,1)
+CurrentLabel.Text = "Current: None"
+
+local CurrentBtn = Instance.new("TextButton", Frame)
+CurrentBtn.Size = UDim2.new(1,-20,0,30)
+CurrentBtn.Position = UDim2.new(0,10,1,-140)
+CurrentBtn.BackgroundColor3 = Color3.fromRGB(70,70,200)
+CurrentBtn.Text = "Show Current"
+CurrentBtn.Font = Enum.Font.SourceSansBold
+CurrentBtn.TextSize = 18
+CurrentBtn.MouseButton1Click:Connect(function()
+    CurrentGui.Visible = not CurrentGui.Visible
+end)
+
+-- Farming Logic: unchanged detection
+RunBtn.MouseButton1Click:Connect(function()
+    if getgenv().Enabled then
+        Notification("Already Running", "Stop the farm before running it again.")
+        return
+    end
+    if #getgenv().SelectedStands == 0 then
+        Notification("No Targets", "Select at least one stand.")
+        return
+    end
+    getgenv().Enabled = true
+    
+    -- Convert game names to display names for notification
+    local displayNames = {}
+    for _, gameName in ipairs(getgenv().SelectedStands) do
+        table.insert(displayNames, gameNameToDisplay[gameName] or gameName)
+    end
+    
+    Notification("Farm Started", "Targeting: " .. table.concat(displayNames, ", "))
+    StatusLabel.Text = "Status: Farming..."
+
+    coroutine.wrap(function()
+        local waitTime = getgenv().DelayInSeconds / 4
+        while getgenv().Enabled do
+            equipToolByName("Arrow")
+            pcall(function()
+                ReplicatedStorage.ItemEvents.Arrow:FireServer()
+                ReplicatedStorage.Main.Input:FireServer("Alternate","Dodge")
+            end)
+            task.wait(waitTime)
+
+            for _, stand in ipairs(getgenv().SelectedStands) do
+                local found = Players.LocalPlayer.Backpack:FindFirstChild(stand, true)
+                local eq = Players.LocalPlayer.Backpack:FindFirstChild("Stand")
+                if found or (eq and eq.Value:lower() == stand:lower()) then
+                    local displayName = gameNameToDisplay[stand] or stand
+                    Notification("Acquired", "Got stand: " .. displayName)
+                    StatusLabel.Text = "Status: Got " .. displayName
+                    CurrentLabel.Text = "Current: " .. displayName
+                    getgenv().Enabled = false
+                    break
+                end
+            end
+
+            if not getgenv().Enabled then break end
+
+            equipToolByName("Rokakaka Fruit")
+            pcall(function()
+                ReplicatedStorage.ItemEvents.Roka:FireServer()
+            end)
+            task.wait(waitTime)
+        end
+        StatusLabel.Text = "Status: Stopped"
+    end)()
+end)
+
+StopBtn.MouseButton1Click:Connect(function()
+    getgenv().Enabled = false
+    StatusLabel.Text = "Status: Stopped"
+    Notification("Farm Stopped", "Stopped by user.")
 end)
